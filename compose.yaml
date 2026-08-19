@@ -1,0 +1,25 @@
+services:
+  http-server-projeto-korp:
+    build: .
+    networks:
+      - projeto-korp-network
+
+  nginx:
+    image: nginx
+    networks:
+      - projeto-korp-network
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-config:/etc/nginx/conf.d:ro
+    depends_on:
+      - http-server-projeto-korp
+    
+
+
+volumes:
+  nginx-config:
+
+networks:
+  projeto-korp-network:
+    driver: bridge
