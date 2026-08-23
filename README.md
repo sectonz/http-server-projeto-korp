@@ -4,7 +4,7 @@ Projeto desenvolvido como solução para o desafio técnico de DevOps/SRE e Back
 
 ---
 
-## 📌 Visão Geral da Solução
+## Visão Geral da Solução
 
 A arquitetura do projeto foi estruturada em três camadas principais:
 
@@ -15,7 +15,7 @@ A arquitetura do projeto foi estruturada em três camadas principais:
 
 ---
 
-## 🏗️ Arquitetura do Ambiente
+## Arquitetura do Ambiente
 
 ```text
                +-------------------------------------------------------------+
@@ -42,7 +42,7 @@ A arquitetura do projeto foi estruturada em três camadas principais:
 
 ---
 
-## 🚀 Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 - **Linguagem**: [Go 1.23](https://golang.org/)
 - **Containerização**: [Docker](https://www.docker.com/)
