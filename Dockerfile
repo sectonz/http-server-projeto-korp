@@ -4,9 +4,10 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /src
 
+COPY go.mod ./
 COPY main.go ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/http-server-projeto-korp main.go
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -o /out/http-server-projeto-korp main.go
 
 FROM alpine:3.20
 
@@ -19,4 +20,3 @@ EXPOSE 8080
 USER 65532:65532
 
 ENTRYPOINT ["/app/http-server-projeto-korp"]
-
