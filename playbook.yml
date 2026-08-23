@@ -1,0 +1,109 @@
+---
+- name: Provisionamento e Automação do Ambiente HTTP Server Projeto Korp
+  hosts: all
+  gather_facts: true
+
+  vars:
+    project_dir: "{{ playbook_dir }}"
+    docker_network_name: "projeto-korp-network"
+    service_endpoint: "http://localhost:80/projeto-korp"
+    health_endpoint: "http://localhost:80/health"
+    prometheus_url: "http://localhost:9090"
+    grafana_url: "http://localhost:3000"
+
+  tasks:
+    
+    - name: Verificar se o Docker está instalado e acessível
+      ansible.builtin.command: docker info
+      register: docker_info
+      failed_when: false
+      changed_when: false
+
+    - name: Bloco de instalação e inicialização do Docker (caso necessário)
+      when: docker_info.rc != 0
+      block:
+        - name: Verificar se o binário do Docker existe
+          ansible.builtin.command: which docker
+          register: docker_binary
+          failed_when: false
+          changed_when: false
+
+        - name: Instalar Docker via script oficial (caso binário não exista)
+          when: docker_binary.rc != 0
+          become: true
+          ansible.builtin.shell: |
+            curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+            sh /tmp/get-docker.sh
+          args:
+            creates: /usr/bin/docker
+
+        - name: Iniciar e habilitar o serviço Docker via systemd
+          become: true
+          ansible.builtin.service:
+            name: docker
+            state: started
+            enabled: true
+          ignore_errors: true
+
+    - name: Verificar se a rede Docker '{{ docker_network_name }}' existe
+      ansible.builtin.command: "docker network inspect {{ docker_network_name }}"
+      register: network_check
+      failed_when: false
+      changed_when: false
+
+    - name: Criar a rede Docker no modo bridge
+      ansible.builtin.command: "docker network create --driver bridge {{ docker_network_name }}"
+      when: network_check.rc != 0
+      changed_when: true
+
+    - name: Fazer build da imagem do serviço http-server-projeto-korp
+      ansible.builtin.command:
+        cmd: docker compose build http-server-projeto-korp
+        chdir: "{{ project_dir }}"
+      register: build_result
+      changed_when: "'Successfully built' in build_result.stdout or 'Built' in build_result.stdout"
+
+    - name: Iniciar todos os containers via Docker Compose (Nginx, Go, Prometheus, Grafana)
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: "{{ project_dir }}"
+      register: compose_up
+      changed_when: "'Started' in compose_up.stdout or 'Creating' in compose_up.stdout"
+
+    - name: Obter status dos containers em execução
+      ansible.builtin.command:
+        cmd: docker compose ps
+        chdir: "{{ project_dir }}"
+      register: compose_ps
+      changed_when: false
+
+    - name: Exibir containers ativos
+      ansible.builtin.debug:
+        msg: "{{ compose_ps.stdout_lines }}"
+
+    - name: Aguardar o serviço HTTP responder no endpoint principal (/projeto-korp)
+      ansible.builtin.uri:
+        url: "{{ service_endpoint }}"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: api_response
+      until: api_response.status == 200
+      retries: 15
+      delay: 2
+
+    - name: Validar endpoint de healthcheck (/health)
+      ansible.builtin.uri:
+        url: "{{ health_endpoint }}"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: health_response
+
+    - name: Exibir resposta da validação do serviço no console
+      ansible.builtin.debug:
+        msg:
+          - "Resposta do endpoint {{ service_endpoint }}:"
+          - "{{ api_response.json | default(api_response.content) }}"
+          - "Resposta do healthcheck {{ health_endpoint }}:"
+          - "{{ health_response.json | default(health_response.content) }}"
